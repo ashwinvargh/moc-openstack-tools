@@ -12,7 +12,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# import ConfigParser
 import os
 import csv
 from keystoneclient.v3 import client
