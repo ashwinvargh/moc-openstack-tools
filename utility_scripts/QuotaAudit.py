@@ -10,10 +10,11 @@
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
-# cleaunder the License.
+# under the License.
 
 # import ConfigParser
 import os
+import csv
 from keystoneclient.v3 import client
 from keystoneauth1 import session
 from keystoneauth1.identity import v2
@@ -22,6 +23,7 @@ from neutronclient.v2_0 import client as nclient
 from novaclient import client as novaclient
 from cinderclient.v2 import client as cinderclient
 
+    
 # Use only one of the auth sections below
 
 """
@@ -90,7 +92,50 @@ def to_single_dict(no_q, ci_q, ne_q):
     return combined
 
 
+def proj_to_request_dict(project_name):
+ 
+    request_dict = {}
+    with open("Real.csv", "rb") as source:
+        reader = csv.DictReader(source)
+        for row in reader:
+            if row['OpenStack project name'] == project_name:
+                request_dict['instances'] = row['Instances']
+                request_dict['cores'] = row['VCPUs']
+                request_dict['ram'] = row['RAM']
+                request_dict['floatingip'] = row['Floating IPs']
+                request_dict['network'] = row['Networks']
+                request_dict['port'] = row['Ports']
+                request_dict['volumes'] = row['Volumes']
+                request_dict['snapshots'] = row['Snapshots']
+                request_dict['gigabytes'] = row['Volume & Snapshot Storage']
+    return request_dict
+
+
+def configure_requests(dict_with_blanks):  # singles out the requests
+    
+    configured_dict = {}
+    for key in dict_with_blanks:
+        if dict_with_blanks[key] != '':
+            configured_dict[key] = dict_with_blanks[key]
+            if key == 'ram':  # Requests were made in GB not MB
+                configured_dict[key] = str(int(dict_with_blanks[key]) * 1024)
+    return configured_dict
+
+
+def compare_request_with_real(requested_quotas, all_quotas):
+    
+    if requested_quotas == {}:  # no request was made but quotas are changed
+        return False
+    for key in requested_quotas:
+        if int(requested_quotas[key]) == all_quotas[key]:
+            continue
+        else:
+            return False
+    return True
+
+
 all_neutron_quotas = [q for q in neutron.list_quotas()['quotas']]
+
 for qset in all_neutron_quotas:
     proj_id = qset['tenant_id']
 
@@ -98,12 +143,21 @@ for qset in all_neutron_quotas:
         project = keystone.projects.get(proj_id)
         nova_quotas = nova.quotas.get(proj_id).to_dict()
         cinder_quotas = cinder.quotas.get(proj_id).to_dict()
-        combined_quotas = to_single_dict(nova_quotas, cinder_quotas, qset)
+        actual_quotas = to_single_dict(nova_quotas, cinder_quotas, qset)
 
-        if diff_moc_quotas(combined_quotas):
-            print project
-            print "Unique Project Quotas:", diff_moc_quotas(combined_quotas)
+        if diff_moc_quotas(actual_quotas):
+
+            quota_updates = proj_to_request_dict(project.name)
+            configured_quotas = configure_requests(quota_updates)
+
+            if compare_request_with_real(configured_quotas, actual_quotas):
+                print project.name + "'s", "request matches its quotas."
+            else:
+                print project.name + "'s", "request doesn't match quotas."
+
+        else:
+            print project.name, "has default quotas."
 
     except NotFound:
         # it seems when projects are deleted their quota sets are not ?
-        print "%s not found" % proj_id
+        print "%s not found" % proj_to_request_dict
