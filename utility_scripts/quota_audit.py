@@ -160,7 +160,7 @@ for qset in all_neutron_quotas:
                 no_rec_of_request.append(project.name)
 
         else:
-            print project.name, "has default quotas."
+            print project.name, "has the default quotas."
 
     except NotFound:
         # it seems when projects are deleted their quota sets are not ?
