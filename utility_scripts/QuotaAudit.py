@@ -94,7 +94,7 @@ def to_single_dict(no_q, ci_q, ne_q):
 def proj_to_request_dict(project_name):
  
     request_dict = {}
-    with open("Real.csv", "rb") as source:
+    with open("Real.csv", "rb") as source:  # change file name
         reader = csv.DictReader(source)
         for row in reader:
             if row['OpenStack project name'] == project_name:
@@ -110,21 +110,17 @@ def proj_to_request_dict(project_name):
     return request_dict
 
 
-def configure_requests(dict_with_blanks):  # singles out the requests
-    
-    configured_dict = {}
-    for key in dict_with_blanks:
-        if dict_with_blanks[key] != '':
-            configured_dict[key] = dict_with_blanks[key]
-            if key == 'ram':  # Requests were made in GB not MB
-                configured_dict[key] = str(int(dict_with_blanks[key]) * 1024)
+def isolate_requests(dict_with_blanks):  # singles out the requests
+
+    configured_dict = dict((k, v) for k, v in dict_with_blanks.items() if v)
+    for k in configured_dict:
+        if k == 'ram':
+            configured_dict[k] = str(int(configured_dict[k]) * 1024)
     return configured_dict
 
 
 def compare_request_with_real(requested_quotas, all_quotas):
     
-    if requested_quotas == {}:  # no request was made but quotas are changed
-        return False
     for key in requested_quotas:
         if int(requested_quotas[key]) == all_quotas[key]:
             continue
@@ -134,6 +130,7 @@ def compare_request_with_real(requested_quotas, all_quotas):
 
 
 all_neutron_quotas = [q for q in neutron.list_quotas()['quotas']]
+no_rec_of_request = []
 
 for qset in all_neutron_quotas:
     proj_id = qset['tenant_id']
@@ -147,12 +144,20 @@ for qset in all_neutron_quotas:
         if diff_moc_quotas(actual_quotas):
 
             quota_updates = proj_to_request_dict(project.name)
-            configured_quotas = configure_requests(quota_updates)
+            isolated_requests = isolate_requests(quota_updates)
 
-            if compare_request_with_real(configured_quotas, actual_quotas):
+            unique_quotas = diff_moc_quotas(actual_quotas)
+
+            if len(unique_quotas) > len(isolated_requests):  # partial request
+                print project.name + "'s", "request doesn't match quotas."
+                no_rec_of_request.append(project.name)
+                continue
+
+            if compare_request_with_real(isolated_requests, actual_quotas):
                 print project.name + "'s", "request matches its quotas."
             else:
                 print project.name + "'s", "request doesn't match quotas."
+                no_rec_of_request.append(project.name)
 
         else:
             print project.name, "has default quotas."
@@ -160,3 +165,4 @@ for qset in all_neutron_quotas:
     except NotFound:
         # it seems when projects are deleted their quota sets are not ?
         print "%s not found" % proj_to_request_dict
+print "No record of request for increase:", no_rec_of_request
