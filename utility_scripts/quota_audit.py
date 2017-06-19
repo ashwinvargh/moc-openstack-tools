@@ -11,7 +11,11 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
+"""Audits quota requests
+Utility script for finding projects that don't match quota requests.
+Usage:
+    python quota_audit.py
+"""
 import os
 import csv
 from keystoneclient.v3 import client
@@ -22,7 +26,6 @@ from neutronclient.v2_0 import client as nclient
 from novaclient import client as novaclient
 from cinderclient.v2 import client as cinderclient
 
-    
 # Use only one of the auth sections below
 
 """
