@@ -36,10 +36,9 @@ from cinderclient.v2 import client as cinderclient
 
 
 def diff_moc_quotas(project_quotas):
-
     different_quotas = {}
-    for resource in moc_standards:
-        if moc_standards[resource] == project_quotas[resource]:
+    for resource in MOC_STANDARDS:
+        if MOC_STANDARDS[resource] == project_quotas[resource]:
             continue
         else:
             different_quotas[resource] = project_quotas[resource]
@@ -47,7 +46,6 @@ def diff_moc_quotas(project_quotas):
 
 
 def to_single_dict(nova_q, cinder_q, neutron_q):
-
     combined = {}
     combined.update(nova_q)
     combined.update(cinder_q)
@@ -56,9 +54,8 @@ def to_single_dict(nova_q, cinder_q, neutron_q):
 
 
 def proj_to_request_dict(project_name):
-
     request_dict = {}
-    for row in reader:
+    for row in READER:
         if row['OpenStack project name'] == project_name:
             request_dict['instances'] = row['Instances']
             request_dict['cores'] = row['VCPUs']
@@ -70,10 +67,9 @@ def proj_to_request_dict(project_name):
             request_dict['snapshots'] = row['Snapshots']
             request_dict['gigabytes'] = row['Volume & Snapshot Storage']
     return request_dict
-
+ 
 
 def isolate_requests(dict_with_blanks):  # singles out the requests
-
     configured_dict = {k: v for k, v in dict_with_blanks.items() if v}
     if 'ram' in configured_dict.keys():
         configured_dict['ram'] = str(int(configured_dict['ram']) * 1024)
@@ -81,7 +77,6 @@ def isolate_requests(dict_with_blanks):  # singles out the requests
 
 
 def compare_request_with_real(requested_quotas, all_quotas):
-    
     for key in requested_quotas:
         if int(requested_quotas[key]) == all_quotas[key]:
             continue
@@ -123,9 +118,9 @@ nova = novaclient.Client(2, session=sess)
 cinder = cinderclient.Client(session=sess)
 
 with open(args.filename, "rb") as source:
-    reader = list(csv.DictReader(source))
+    READER = list(csv.DictReader(source))
 
-moc_standards = {'subnet': 10, 'router': 10, 'port': 10, 'network': 5,
+MOC_STANDARDS = {'subnet': 10, 'router': 10, 'port': 10, 'network': 5,
                  'floatingip': 2, 'security_group': -1,
                  'security_group_rule': -1, 'ram': 51200, 'gigabytes': 1000,
                  'snapshots': 10, 'volumes': 10,
